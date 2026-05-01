@@ -140,7 +140,7 @@ const firebaseConfig = {
 
 let db = null;
 let firebaseReady = false;
-if (firebaseConfig.apiKey !== 'AIzaSyBydNn5GqM0Wm_giiJMnfndoTyQx4w_APE') {
+if (firebaseConfig.apiKey !== 'YOUR_API_KEY') {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   firebaseReady = true;
