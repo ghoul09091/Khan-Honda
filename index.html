@@ -27,6 +27,12 @@
     .search-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .invoice{border:2px dashed #b6bfd3;padding:14px;border-radius:10px;background:#fff}
     .muted{color:var(--muted)}
+
+    @media print{
+      body *{visibility:hidden}
+      #invoicePreview, #invoicePreview *{visibility:visible}
+      #invoicePreview{position:absolute;left:0;top:0;width:100%;border:none}
+    }
   </style>
 </head>
 <body>
@@ -39,7 +45,7 @@
   </section>
 
   <main class="container" style="padding:20px">
-    <div class="grid cols-2">
+    <div id="publicSection" class="grid cols-2">
       <div class="card"><h3>Engine & Tune-up</h3><p class="muted">Periodic tuning, carburetor checks, valve settings and performance optimization.</p></div>
       <div class="card"><h3>Oil & Brake Service</h3><p class="muted">Oil change, brake shoe replacement, cable and safety inspections.</p></div>
     </div>
@@ -59,18 +65,18 @@
         <div class="search-wrap">
           <div>
             <label>Search by Phone Number</label>
-            <input id="searchPhone" placeholder="e.g. 03001234567" />
+            <input id="searchPhone" maxlength="11" inputmode="numeric" placeholder="e.g. 03001234567" />
           </div>
           <div>
             <label>Search by Bill Number (6 digit)</label>
-            <input id="searchBill" placeholder="e.g. 104522" />
+            <input id="searchBill" maxlength="6" inputmode="numeric" placeholder="e.g. 104522" />
           </div>
         </div>
         <div class="action-row"><button class="btn" id="searchBtn">Search</button></div>
 
         <div id="clientHistoryWrap" class="hidden">
           <h4>Client Service History</h4>
-          <table id="historyTable"><thead><tr><th>Date/Time</th><th>Bill #</th><th>Service</th><th>Qty</th><th>Price</th><th>Total Paid</th></tr></thead><tbody></tbody></table>
+          <table id="historyTable"><thead><tr><th>Date/Time</th><th>Bill #</th><th>Services Summary</th><th>Qty</th><th>Price</th><th>Total Paid</th></tr></thead><tbody></tbody></table>
         </div>
 
         <div id="clientFormWrap" class="hidden">
@@ -116,13 +122,12 @@ import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, 
 
 const ADMIN_PASSWORD = '1122';
 const firebaseConfig = {
-   apiKey: "AIzaSyBydNn5GqM0Wm_giiJMnfndoTyQx4w_APE",
-  authDomain: "khan-honda-service-center.firebaseapp.com",
-  projectId: "khan-honda-service-center",
-  storageBucket: "khan-honda-service-center.firebasestorage.app",
-  messagingSenderId: "68876808026",
-  appId: "1:68876808026:web:a9f3acb0eed06044918d63",
-
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID'
 };
 
 let db = null;
@@ -135,6 +140,22 @@ if (firebaseConfig.apiKey !== 'YOUR_API_KEY') {
 
 const storage = { clients: {}, invoices: [], inventory: [] };
 const el=id=>document.getElementById(id);
+
+
+function toggleSearchMode(){
+  const hasPhone = el('searchPhone').value.trim().length>0;
+  const hasBill = el('searchBill').value.trim().length>0;
+  el('searchBill').disabled = hasPhone;
+  el('searchPhone').disabled = hasBill;
+}
+el('searchPhone').addEventListener('input',()=>{
+  el('searchPhone').value = el('searchPhone').value.replace(/\D/g,'').slice(0,11);
+  toggleSearchMode();
+});
+el('searchBill').addEventListener('input',()=>{
+  el('searchBill').value = el('searchBill').value.replace(/\D/g,'').slice(0,6);
+  toggleSearchMode();
+});
 
 async function loadData(){
   if(!firebaseReady){
@@ -170,9 +191,9 @@ async function saveInventoryItem(item){
 
 el('openAdminBtn').onclick=async ()=>{
   const pass = prompt('Enter admin password');
-  if(pass===ADMIN_PASSWORD){await loadData();el('adminPanel').classList.remove('hidden');window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});} else alert('Wrong password');
+  if(pass===ADMIN_PASSWORD){await loadData();el('publicSection').classList.add('hidden');el('adminPanel').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});} else alert('Wrong password');
 };
-el('logoutBtn').onclick=()=>el('adminPanel').classList.add('hidden');
+el('logoutBtn').onclick=()=>{el('adminPanel').classList.add('hidden');el('publicSection').classList.remove('hidden');};
 el('showBilling').onclick=()=>{el('billingPage').classList.remove('hidden');el('inventoryPage').classList.add('hidden');};
 el('showInventory').onclick=()=>{el('inventoryPage').classList.remove('hidden');el('billingPage').classList.add('hidden');renderInventory();};
 
@@ -194,7 +215,14 @@ function updateTotals(){
 }
 function renderHistory(phone){
   const rows=storage.invoices.filter(i=>i.phone===phone); const body=el('historyTable').querySelector('tbody'); body.innerHTML='';
-  rows.forEach(i=>i.items.forEach(it=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i.time}</td><td>${i.billNo}</td><td>${it.service}</td><td>${it.qty}</td><td>${it.price}</td><td>${i.total}</td>`;body.appendChild(tr)}));
+  rows.forEach(i=>{
+    const services = i.items.map(it=>`${it.service} (x${it.qty})`).join(', ');
+    const tr=document.createElement('tr');
+    tr.style.cursor='pointer';
+    tr.innerHTML=`<td>${i.time}</td><td>${i.billNo}</td><td>${services}</td><td>-</td><td>-</td><td>${i.total}</td>`;
+    tr.onclick=()=>showInvoice(i);
+    body.appendChild(tr);
+  });
 }
 
 el('searchBtn').onclick=()=>{
@@ -205,6 +233,7 @@ el('searchBtn').onclick=()=>{
     showInvoice(inv); return;
   }
   if(!phone) return alert('Enter phone or bill number.');
+  if(phone.length!==11) return alert('Phone number must be exactly 11 digits.');
   const client=storage.clients[phone];
   el('currentBillTable').querySelector('tbody').innerHTML=''; addRow(); el('billingWrap').classList.remove('hidden');
   if(client){
