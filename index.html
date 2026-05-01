@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Khan Honda Service Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--red:#d51010;--dark:#101521;--bg:#f4f6fb;--card:#fff;--muted:#6e7786;--ok:#178a46}
+    *{box-sizing:border-box}body{font-family:Montserrat,sans-serif;margin:0;background:var(--bg);color:var(--dark)}
+    .hero{background:linear-gradient(120deg,#121a2d 0%,#d51010 100%);color:#fff;padding:48px 20px}
+    .container{max-width:1150px;margin:0 auto}
+    h1,h2,h3{margin:.2rem 0}.hero p{opacity:.95;max-width:700px}
+    .btn{background:var(--red);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:#24314d}.btn.ok{background:var(--ok)}
+    .grid{display:grid;gap:16px}.grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 3px 18px rgba(0,0,0,.08)}
+    label{font-size:.88rem;font-weight:600;display:block;margin:10px 0 4px}
+    input,select,textarea{width:100%;padding:10px;border:1px solid #c6cbd9;border-radius:8px;font:inherit}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:.9rem}
+    th,td{border:1px solid #d9deea;padding:8px;text-align:left}th{background:#eef2fb}
+    .hidden{display:none!important}.top-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:20px 0}
+    .pill{background:#e8edf8;color:#223;padding:7px 12px;border-radius:999px;font-size:.84rem}
+    .action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .search-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .invoice{border:2px dashed #b6bfd3;padding:14px;border-radius:10px;background:#fff}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <div class="container">
+      <h1>Khan Honda Service Center</h1>
+      <p>Professional motorcycle service workshop in Pakistan inspired by Atlas Honda color theme. Fast servicing, transparent billing, client history, and inventory tracking.</p>
+      <button class="btn secondary" id="openAdminBtn">Admin Login</button><p style="margin-top:10px">Set Firebase config in code to save cloud history (fallback: local storage).</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:20px">
+    <div class="grid cols-2">
+      <div class="card"><h3>Engine & Tune-up</h3><p class="muted">Periodic tuning, carburetor checks, valve settings and performance optimization.</p></div>
+      <div class="card"><h3>Oil & Brake Service</h3><p class="muted">Oil change, brake shoe replacement, cable and safety inspections.</p></div>
+    </div>
+
+    <section id="adminPanel" class="hidden" style="margin-top:24px">
+      <div class="top-nav">
+        <h2>Admin Dashboard</h2>
+        <div class="action-row">
+          <button class="btn" id="showBilling">Client RCM & Billing</button>
+          <button class="btn secondary" id="showInventory">Inventory</button>
+          <button class="btn" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+
+      <div id="billingPage" class="card">
+        <h3>Client RCM & Billing</h3>
+        <div class="search-wrap">
+          <div>
+            <label>Search by Phone Number</label>
+            <input id="searchPhone" placeholder="e.g. 03001234567" />
+          </div>
+          <div>
+            <label>Search by Bill Number (6 digit)</label>
+            <input id="searchBill" placeholder="e.g. 104522" />
+          </div>
+        </div>
+        <div class="action-row"><button class="btn" id="searchBtn">Search</button></div>
+
+        <div id="clientHistoryWrap" class="hidden">
+          <h4>Client Service History</h4>
+          <table id="historyTable"><thead><tr><th>Date/Time</th><th>Bill #</th><th>Service</th><th>Qty</th><th>Price</th><th>Total Paid</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div id="clientFormWrap" class="hidden">
+          <h4>Client Info</h4>
+          <div class="grid cols-2">
+            <div><label>Phone Number</label><input id="clientPhone"></div>
+            <div><label>Name</label><input id="clientName"></div>
+            <div><label>Bike</label><input id="clientBike"></div>
+            <div><label>Address</label><input id="clientAddress"></div>
+          </div>
+        </div>
+
+        <div id="billingWrap" class="hidden">
+          <h4>Current Billing</h4>
+          <table id="currentBillTable"><thead><tr><th>Service</th><th>Qty</th><th>Price</th><th>Line Total</th></tr></thead><tbody></tbody></table>
+          <div class="action-row">
+            <button class="btn secondary" id="addServiceRow">Add Service Row</button>
+            <button class="btn ok" id="saveInvoiceBtn">Save Invoice</button>
+          </div>
+          <p id="billTotalText" class="pill">Total: PKR 0</p>
+        </div>
+
+        <div id="invoicePreview" class="invoice hidden"></div>
+      </div>
+
+      <div id="inventoryPage" class="card hidden">
+        <h3>Inventory System</h3>
+        <div class="grid cols-2">
+          <div><label>Item Name</label><input id="invName"></div>
+          <div><label>SKU / Code</label><input id="invSku"></div>
+          <div><label>Quantity</label><input id="invQty" type="number" min="0"></div>
+          <div><label>Unit Price (PKR)</label><input id="invPrice" type="number" min="0"></div>
+        </div>
+        <div class="action-row"><button class="btn" id="addInvBtn">Add / Update Item</button></div>
+        <table id="invTable"><thead><tr><th>SKU</th><th>Name</th><th>Qty</th><th>Unit Price</th><th>Stock Value</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+const ADMIN_PASSWORD = '1122';
+const firebaseConfig = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID'
+};
+
+let db = null;
+let firebaseReady = false;
+if (firebaseConfig.apiKey !== 'YOUR_API_KEY') {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  firebaseReady = true;
+}
+
+const storage = { clients: {}, invoices: [], inventory: [] };
+const el=id=>document.getElementById(id);
+
+async function loadData(){
+  if(!firebaseReady){
+    storage.clients = JSON.parse(localStorage.getItem('kh_clients') || '{}');
+    storage.invoices = JSON.parse(localStorage.getItem('kh_invoices') || '[]');
+    storage.inventory = JSON.parse(localStorage.getItem('kh_inventory') || '[]');
+    return;
+  }
+  const clientsSnap = await getDocs(collection(db, 'clients'));
+  storage.clients = {};
+  clientsSnap.forEach(d=>storage.clients[d.id]=d.data());
+  const invoicesSnap = await getDocs(collection(db, 'invoices'));
+  storage.invoices = invoicesSnap.docs.map(d=>d.data());
+  const invSnap = await getDocs(collection(db, 'inventory'));
+  storage.inventory = invSnap.docs.map(d=>d.data());
+}
+
+async function saveClient(phone, data){
+  if(firebaseReady) return setDoc(doc(db,'clients',phone), data);
+  storage.clients[phone]=data;
+  localStorage.setItem('kh_clients', JSON.stringify(storage.clients));
+}
+async function saveInvoice(inv){
+  if(firebaseReady) return addDoc(collection(db,'invoices'), inv);
+  storage.invoices.push(inv);
+  localStorage.setItem('kh_invoices', JSON.stringify(storage.invoices));
+}
+async function saveInventoryItem(item){
+  if(firebaseReady) return setDoc(doc(db,'inventory',item.sku), item);
+  const ex=storage.inventory.find(i=>i.sku===item.sku); if(ex){Object.assign(ex,item);} else storage.inventory.push(item);
+  localStorage.setItem('kh_inventory', JSON.stringify(storage.inventory));
+}
+
+el('openAdminBtn').onclick=async ()=>{
+  const pass = prompt('Enter admin password');
+  if(pass===ADMIN_PASSWORD){await loadData();el('adminPanel').classList.remove('hidden');window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});} else alert('Wrong password');
+};
+el('logoutBtn').onclick=()=>el('adminPanel').classList.add('hidden');
+el('showBilling').onclick=()=>{el('billingPage').classList.remove('hidden');el('inventoryPage').classList.add('hidden');};
+el('showInventory').onclick=()=>{el('inventoryPage').classList.remove('hidden');el('billingPage').classList.add('hidden');renderInventory();};
+
+function generateBillNo(){let n; do{ n = Math.floor(100000+Math.random()*900000).toString(); }while(storage.invoices.find(x=>x.billNo===n)); return n;}
+function now(){return new Date().toLocaleString();}
+
+function addRow(service='',qty=1,price=0){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input value="${service}"/></td><td><input type="number" min="1" value="${qty}"/></td><td><input type="number" min="0" value="${price}"/></td><td class="lt">0</td>`;
+  el('currentBillTable').querySelector('tbody').appendChild(tr);
+  [...tr.querySelectorAll('input')].forEach(i=>i.oninput=updateTotals);
+  updateTotals();
+}
+function updateTotals(){
+  let total=0; el('currentBillTable').querySelectorAll('tbody tr').forEach(tr=>{
+    const qty=Number(tr.children[1].querySelector('input').value||0), price=Number(tr.children[2].querySelector('input').value||0), line=qty*price;
+    tr.querySelector('.lt').innerText=line; total+=line;
+  }); el('billTotalText').innerText=`Total: PKR ${total}`;
+}
+function renderHistory(phone){
+  const rows=storage.invoices.filter(i=>i.phone===phone); const body=el('historyTable').querySelector('tbody'); body.innerHTML='';
+  rows.forEach(i=>i.items.forEach(it=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i.time}</td><td>${i.billNo}</td><td>${it.service}</td><td>${it.qty}</td><td>${it.price}</td><td>${i.total}</td>`;body.appendChild(tr)}));
+}
+
+el('searchBtn').onclick=()=>{
+  const phone=el('searchPhone').value.trim(), bill=el('searchBill').value.trim();
+  el('invoicePreview').classList.add('hidden');
+  if(bill){
+    const inv=storage.invoices.find(x=>x.billNo===bill); if(!inv) return alert('Bill not found');
+    showInvoice(inv); return;
+  }
+  if(!phone) return alert('Enter phone or bill number.');
+  const client=storage.clients[phone];
+  el('currentBillTable').querySelector('tbody').innerHTML=''; addRow(); el('billingWrap').classList.remove('hidden');
+  if(client){
+    el('clientFormWrap').classList.remove('hidden'); el('clientHistoryWrap').classList.remove('hidden');
+    el('clientPhone').value=phone; el('clientName').value=client.name; el('clientBike').value=client.bike; el('clientAddress').value=client.address;
+    renderHistory(phone);
+  } else {
+    el('clientHistoryWrap').classList.add('hidden');
+    const option=prompt('Client not found. Type 1 for Add New Client, 2 for Walk-in Client');
+    if(option==='1'){el('clientFormWrap').classList.remove('hidden');el('clientPhone').value=phone;el('clientName').value='';el('clientBike').value='';el('clientAddress').value='';}
+    else {el('clientFormWrap').classList.add('hidden');}
+  }
+};
+el('addServiceRow').onclick=()=>addRow();
+
+function showInvoice(inv){
+  const div=el('invoicePreview');
+  div.innerHTML=`<h4>Invoice #${inv.billNo}</h4><p><b>Time:</b> ${inv.time}</p><p><b>Client:</b> ${inv.name||'Walk-in'} | <b>Phone:</b> ${inv.phone||'N/A'} | <b>Bike:</b> ${inv.bike||'N/A'}</p>
+  <table><thead><tr><th>Service</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>
+  ${inv.items.map(i=>`<tr><td>${i.service}</td><td>${i.qty}</td><td>${i.price}</td><td>${i.qty*i.price}</td></tr>`).join('')}
+  </tbody></table><h3>Total: PKR ${inv.total}</h3>
+  <div class='action-row'><button class='btn' onclick='window.print()'>Print</button><button class='btn secondary' onclick='downloadInvoice("${inv.billNo}")'>Download</button></div>`;
+  div.classList.remove('hidden');
+}
+window.downloadInvoice=(billNo)=>{
+  const inv=storage.invoices.find(x=>x.billNo===billNo); if(!inv) return;
+  const text=`Invoice #${inv.billNo}\nTime: ${inv.time}\nClient: ${inv.name||'Walk-in'}\nPhone: ${inv.phone||'N/A'}\nBike: ${inv.bike||'N/A'}\n\n`+
+  inv.items.map(i=>`${i.service} | Qty ${i.qty} | Price ${i.price} | Total ${i.qty*i.price}`).join('\n')+`\n\nGrand Total: ${inv.total}`;
+  const blob=new Blob([text],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`invoice-${billNo}.txt`; a.click();
+}
+
+el('saveInvoiceBtn').onclick=async ()=>{
+  const items=[...el('currentBillTable').querySelectorAll('tbody tr')].map(tr=>({
+    service:tr.children[0].querySelector('input').value.trim(), qty:Number(tr.children[1].querySelector('input').value||1), price:Number(tr.children[2].querySelector('input').value||0)
+  })).filter(x=>x.service);
+  if(!items.length) return alert('Add at least one service');
+  const phone=el('clientFormWrap').classList.contains('hidden')?el('searchPhone').value.trim():el('clientPhone').value.trim();
+  const name=el('clientName').value.trim(), bike=el('clientBike').value.trim(), address=el('clientAddress').value.trim();
+  if(!el('clientFormWrap').classList.contains('hidden') && phone){storage.clients[phone]={name,bike,address}; await saveClient(phone,{name,bike,address});}
+  const total=items.reduce((s,i)=>s+i.qty*i.price,0);
+  const inv={billNo:generateBillNo(),time:now(),phone:phone||'',name,bike,address,items,total};
+  storage.invoices.push(inv); await saveInvoice(inv); showInvoice(inv); alert(`Invoice saved. Bill # ${inv.billNo}`);
+  if(phone && storage.clients[phone]){ renderHistory(phone); el('clientHistoryWrap').classList.remove('hidden'); }
+};
+
+function renderInventory(){
+  const tbody=el('invTable').querySelector('tbody'); tbody.innerHTML='';
+  storage.inventory.forEach(i=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${i.sku}</td><td>${i.name}</td><td>${i.qty}</td><td>${i.price}</td><td>${i.qty*i.price}</td>`; tbody.appendChild(tr);});
+}
+el('addInvBtn').onclick=async ()=>{
+  const name=el('invName').value.trim(), sku=el('invSku').value.trim(), qty=Number(el('invQty').value||0), price=Number(el('invPrice').value||0);
+  if(!name || !sku) return alert('Enter name and SKU');
+  const item={name,sku,qty,price};
+  await saveInventoryItem(item);
+  if(firebaseReady){const ex=storage.inventory.find(i=>i.sku===sku); if(ex){Object.assign(ex,item);} else storage.inventory.push(item);}
+  renderInventory();
+}
+</script>
+</body>
+</html>
