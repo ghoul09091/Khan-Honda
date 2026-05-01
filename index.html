@@ -33,6 +33,11 @@
       #invoicePreview, #invoicePreview *{visibility:visible}
       #invoicePreview{position:absolute;left:0;top:0;width:100%;border:none}
     }
+
+    .modal-backdrop{position:fixed;inset:0;background:rgba(16,21,33,.55);display:flex;align-items:center;justify-content:center;z-index:9999}
+    .modal-card{background:#fff;border-radius:14px;max-width:430px;width:92%;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.24)}
+    .modal-title{margin:0 0 6px;font-size:1.1rem}.modal-sub{margin:0 0 12px;color:#5f6878;font-size:.9rem}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
   </style>
 </head>
 <body>
@@ -116,19 +121,20 @@
     </section>
   </main>
 
+<div id="modalRoot" class="hidden"></div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const ADMIN_PASSWORD = '1122';
 const firebaseConfig = {
-  apiKey: "AIzaSyBydNn5GqM0Wm_giiJMnfndoTyQx4w_APE",
-  authDomain: "khan-honda-service-center.firebaseapp.com",
-  projectId: "khan-honda-service-center",
-  storageBucket: "khan-honda-service-center.firebasestorage.app",
-  messagingSenderId: "68876808026",
-  appId: "1:68876808026:web:a9f3acb0eed06044918d63",
-
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID'
 };
 
 let db = null;
@@ -141,6 +147,42 @@ if (firebaseConfig.apiKey !== 'YOUR_API_KEY') {
 
 const storage = { clients: {}, invoices: [], inventory: [] };
 const el=id=>document.getElementById(id);
+
+function showModal({title, subtitle='', bodyHTML='', actions=[]}){
+  const root=el('modalRoot');
+  root.classList.remove('hidden');
+  root.innerHTML=`<div class="modal-backdrop"><div class="modal-card"><h4 class="modal-title">${title}</h4><p class="modal-sub">${subtitle}</p>${bodyHTML}<div class="modal-actions"></div></div></div>`;
+  const actionsWrap=root.querySelector('.modal-actions');
+  actions.forEach(a=>{const b=document.createElement('button');b.className=`btn ${a.secondary?'secondary':''}`.trim();b.textContent=a.label;b.onclick=()=>a.onClick();actionsWrap.appendChild(b);});
+}
+function closeModal(){const root=el('modalRoot');root.classList.add('hidden');root.innerHTML='';}
+function askPassword(){
+  return new Promise(resolve=>{
+    showModal({
+      title:'Admin Login',
+      subtitle:'Enter your dashboard password to continue.',
+      bodyHTML:'<label>Password</label><input id="adminPasswordInput" type="password" placeholder="Enter password" />',
+      actions:[
+        {label:'Cancel', secondary:true, onClick:()=>{closeModal();resolve(null);}},
+        {label:'Login', onClick:()=>{const v=el('adminPasswordInput').value;closeModal();resolve(v);}}
+      ]
+    });
+    setTimeout(()=>el('adminPasswordInput')?.focus(),10);
+  });
+}
+function askClientType(){
+  return new Promise(resolve=>{
+    showModal({
+      title:'Client Not Found',
+      subtitle:'Choose how you want to continue billing.',
+      actions:[
+        {label:'Add New Client', onClick:()=>{closeModal();resolve('new');}},
+        {label:'Walk-in Client', secondary:true, onClick:()=>{closeModal();resolve('walkin');}}
+      ]
+    });
+  });
+}
+
 
 
 function toggleSearchMode(){
@@ -191,7 +233,8 @@ async function saveInventoryItem(item){
 }
 
 el('openAdminBtn').onclick=async ()=>{
-  const pass = prompt('Enter admin password');
+  const pass = await askPassword();
+  if(pass===null) return;
   if(pass===ADMIN_PASSWORD){await loadData();el('publicSection').classList.add('hidden');el('adminPanel').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});} else alert('Wrong password');
 };
 el('logoutBtn').onclick=()=>{el('adminPanel').classList.add('hidden');el('publicSection').classList.remove('hidden');};
@@ -243,9 +286,10 @@ el('searchBtn').onclick=()=>{
     renderHistory(phone);
   } else {
     el('clientHistoryWrap').classList.add('hidden');
-    const option=prompt('Client not found. Type 1 for Add New Client, 2 for Walk-in Client');
-    if(option==='1'){el('clientFormWrap').classList.remove('hidden');el('clientPhone').value=phone;el('clientName').value='';el('clientBike').value='';el('clientAddress').value='';}
-    else {el('clientFormWrap').classList.add('hidden');}
+    askClientType().then(option=>{
+      if(option==='new'){el('clientFormWrap').classList.remove('hidden');el('clientPhone').value=phone;el('clientName').value='';el('clientBike').value='';el('clientAddress').value='';}
+      else {el('clientFormWrap').classList.add('hidden');}
+    });
   }
 };
 el('addServiceRow').onclick=()=>addRow();
