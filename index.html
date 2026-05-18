@@ -28,7 +28,8 @@
     .search-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .invoice{border:2px dashed #b6bfd3;padding:14px;border-radius:10px;background:#fff}
     .muted{color:var(--muted)}
-    .public-nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+    .public-nav{display:grid;grid-template-columns:1fr;gap:10px;margin:16px 0;max-width:420px}
+    .public-nav .btn{text-align:left;font-size:1rem;padding:13px 16px}
     .footer-tools{margin:26px 0 10px}
     .footer-tools .card{padding:14px}
     .contact-bar{background:#fff;border:1px solid #d9deea;padding:12px;border-radius:10px}
@@ -70,9 +71,10 @@
   <main class="container" style="padding:20px">
     <div id="publicSection">
       <div class="public-nav">
-        <button class="btn" id="showServicesBtn">Our Services</button>
-        <button class="btn secondary" id="showBikeSalesBtn">Bike Sale Purchase</button>
-        <button class="btn secondary" id="showBookBtn">Book Appointment</button>
+        <button class="btn" id="showServicesBtn">1. Our Services</button>
+        <button class="btn secondary" id="showBookBtn">2. Book Appointment</button>
+        <button class="btn secondary" id="showBikeSalesBtn">3. Bikes for Sale</button>
+        <button class="btn secondary" id="showFeedbackBtn">4. Leave Feedback</button>
       </div>
 
       <section id="servicesPage" class="grid cols-2">
@@ -120,6 +122,13 @@
         <div class="action-row">
           <button class="btn ok" id="submitAppointmentBtn">Submit Appointment</button>
         </div>
+      </section>
+
+      <section id="feedbackPage" class="card hidden">
+        <h3>Leave Feedback</h3>
+        <p class="muted">Share your service experience with Khan Honda Service Center.</p>
+        <textarea id="publicFeedbackText" rows="3" placeholder="Write your feedback..."></textarea>
+        <div class="action-row"><button class="btn" id="savePublicFeedbackBtn">Submit Feedback</button></div>
       </section>
     </div>
 
@@ -228,6 +237,7 @@
         <table id="notifyTable"><thead><tr><th>Type</th><th>Date/Time</th><th>Summary</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>
         <div id="notifyDetail" class="invoice hidden" style="margin-top:14px"></div>
       </div>
+
       <div id="dashboardPage" class="card">
         <h3>Dashboard Overview</h3>
         <div class="grid cols-2">
@@ -243,18 +253,12 @@
         </div>
         <table id="dashboardHistoryTable"><thead><tr><th>Date/Time</th><th>Name</th><th>Bill Amount</th><th>Services Done</th></tr></thead><tbody></tbody></table>
       </div>
-
     </section>
 
     <footer class="footer-tools" id="publicFooterTools">
       <div class="contact-bar">
         <strong>Contact Us (WhatsApp):</strong>
         <a href="https://wa.me/923021046816" style="font-weight:700;margin-left:6px">03021046816</a>
-      </div>
-      <div class="card" style="margin-top:12px">
-        <h4>Leave Feedback</h4>
-        <textarea id="publicFeedbackText" rows="3" placeholder="Write your feedback..."></textarea>
-        <div class="action-row"><button class="btn" id="savePublicFeedbackBtn">Submit Feedback</button></div>
       </div>
     </footer>
   </main>
@@ -273,7 +277,6 @@ const firebaseConfig = {
   storageBucket: "khan-honda-service-center.firebasestorage.app",
   messagingSenderId: "68876808026",
   appId: "1:68876808026:web:a9f3acb0eed06044918d63",
-
 };
 
 let db = null;
@@ -292,7 +295,13 @@ function showModal({title, subtitle='', bodyHTML='', actions=[]}){
   root.classList.remove('hidden');
   root.innerHTML=`<div class="modal-backdrop"><div class="modal-card"><h4 class="modal-title">${title}</h4><p class="modal-sub">${subtitle}</p>${bodyHTML}<div class="modal-actions"></div></div></div>`;
   const actionsWrap=root.querySelector('.modal-actions');
-  actions.forEach(a=>{const b=document.createElement('button');b.className=`btn ${a.secondary?'secondary':''}`.trim();b.textContent=a.label;b.onclick=()=>a.onClick();actionsWrap.appendChild(b);});
+  actions.forEach(a=>{
+    const b=document.createElement('button');
+    b.className=`btn ${a.secondary?'secondary':''}`.trim();
+    b.textContent=a.label;
+    b.onclick=()=>a.onClick();
+    actionsWrap.appendChild(b);
+  });
 }
 function closeModal(){const root=el('modalRoot');root.classList.add('hidden');root.innerHTML='';}
 function askPassword(){
@@ -318,9 +327,6 @@ function showNewClientNotice(phone){
   });
 }
 
-
-
-
 function toggleSearchMode(){
   const hasPhone = el('searchPhone').value.trim().length>0;
   const hasBill = el('searchBill').value.trim().length>0;
@@ -345,38 +351,51 @@ function loadLocalExtras(){
 async function loadPublicData(){
   loadLocalExtras();
   if(firebaseReady){
-    const bikesSnap = await getDocs(collection(db, 'bikes'));
-    storage.bikes = bikesSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    try{
+      const bikesSnap = await getDocs(collection(db, 'bikes'));
+      storage.bikes = bikesSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    }catch(err){
+      console.warn('Firebase bike load failed; using local bike listings:', err);
+    }
   }
   renderBikeSales();
 }
 async function loadData(){
   loadLocalExtras();
-  if(!firebaseReady){
-    storage.clients = JSON.parse(localStorage.getItem('kh_clients') || '{}');
-    storage.invoices = JSON.parse(localStorage.getItem('kh_invoices') || '[]');
-    storage.inventory = JSON.parse(localStorage.getItem('kh_inventory') || '[]');
-    return;
+  storage.clients = JSON.parse(localStorage.getItem('kh_clients') || '{}');
+  storage.invoices = JSON.parse(localStorage.getItem('kh_invoices') || '[]');
+  storage.inventory = JSON.parse(localStorage.getItem('kh_inventory') || '[]');
+  if(!firebaseReady) return;
+  try{
+    const clientsSnap = await getDocs(collection(db, 'clients'));
+    storage.clients = {};
+    clientsSnap.forEach(d=>storage.clients[d.id]=d.data());
+
+    const invoicesSnap = await getDocs(collection(db, 'invoices'));
+    storage.invoices = invoicesSnap.docs.map(d=>d.data());
+
+    const invSnap = await getDocs(collection(db, 'inventory'));
+    storage.inventory = invSnap.docs.map(d=>d.data());
+
+    const bikesSnap = await getDocs(collection(db, 'bikes'));
+    storage.bikes = bikesSnap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(err){
+    console.warn('Firebase data load failed; using local saved data:', err);
   }
-  const clientsSnap = await getDocs(collection(db, 'clients'));
-  storage.clients = {};
-  clientsSnap.forEach(d=>storage.clients[d.id]=d.data());
-  const invoicesSnap = await getDocs(collection(db, 'invoices'));
-  storage.invoices = invoicesSnap.docs.map(d=>d.data());
-  const invSnap = await getDocs(collection(db, 'inventory'));
-  storage.inventory = invSnap.docs.map(d=>d.data());
-  const bikesSnap = await getDocs(collection(db, 'bikes'));
-  storage.bikes = bikesSnap.docs.map(d=>({id:d.id, ...d.data()}));
 }
 
 async function saveClient(phone, data){
-  if(firebaseReady) return setDoc(doc(db,'clients',phone), data);
   storage.clients[phone]=data;
   localStorage.setItem('kh_clients', JSON.stringify(storage.clients));
+  if(firebaseReady){
+    try{ await setDoc(doc(db,'clients',phone), data); }catch(err){ console.warn('Firebase client save failed:', err); }
+  }
 }
 async function saveInvoice(inv){
-  if(firebaseReady) return addDoc(collection(db,'invoices'), inv);
   localStorage.setItem('kh_invoices', JSON.stringify(storage.invoices));
+  if(firebaseReady){
+    try{ await addDoc(collection(db,'invoices'), inv); }catch(err){ console.warn('Firebase invoice save failed:', err); }
+  }
 }
 function persistExtra(){
   localStorage.setItem('kh_appointments', JSON.stringify(storage.appointments));
@@ -393,47 +412,66 @@ function addNotification(type, payload){
 async function saveInventoryItem(item, originalSku=''){
   if(originalSku && originalSku !== item.sku){
     storage.inventory = storage.inventory.filter(i=>i.sku !== originalSku);
-    if(firebaseReady) await deleteDoc(doc(db,'inventory',originalSku));
+    if(firebaseReady){
+      try{ await deleteDoc(doc(db,'inventory',originalSku)); }catch(err){ console.warn('Firebase old SKU delete failed:', err); }
+    }
   }
   const ex=storage.inventory.find(i=>i.sku===item.sku);
   if(ex){Object.assign(ex,item);} else storage.inventory.push(item);
-  if(firebaseReady) return setDoc(doc(db,'inventory',item.sku), item);
   localStorage.setItem('kh_inventory', JSON.stringify(storage.inventory));
+  if(firebaseReady){
+    try{ await setDoc(doc(db,'inventory',item.sku), item); }catch(err){ console.warn('Firebase inventory save failed:', err); }
+  }
 }
 async function saveBikeListing(bike){
   const ex=storage.bikes.find(b=>b.id===bike.id);
   if(ex){Object.assign(ex,bike);} else storage.bikes.unshift(bike);
-  if(firebaseReady) return setDoc(doc(db,'bikes',bike.id), bike);
   persistExtra();
+  if(firebaseReady){
+    try{
+      await setDoc(doc(db,'bikes',bike.id), bike);
+    }catch(err){
+      console.warn('Bike saved locally, but Firebase bike save failed:', err);
+      alert('Bike saved on this device. Firebase did not accept the picture/details, so it may not appear on other devices until Firebase rules/storage are fixed.');
+    }
+  }
 }
 async function removeBikeListing(id){
   storage.bikes = storage.bikes.filter(b=>b.id!==id);
-  if(firebaseReady) await deleteDoc(doc(db,'bikes',id));
   persistExtra();
+  if(firebaseReady){
+    try{ await deleteDoc(doc(db,'bikes',id)); }catch(err){ console.warn('Firebase bike delete failed:', err); }
+  }
 }
 
 el('openAdminBtn').onclick=async ()=>{
   const pass = await askPassword();
   if(pass===null) return;
-  if(pass===ADMIN_PASSWORD){await loadData();el('publicSection').classList.add('hidden');el('adminPanel').classList.remove('hidden');el('publicFooterTools').classList.add('hidden');document.querySelector('.hero').classList.add('hidden');['billingPage','inventoryPage','notificationsPage','bikeAdminPage'].forEach(id=>el(id).classList.add('hidden'));el('dashboardPage').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});renderNotifications();renderDashboard();renderBikeSales();} else alert('Wrong password');
+  if(pass===ADMIN_PASSWORD){
+    await loadData();
+    el('publicSection').classList.add('hidden');
+    el('adminPanel').classList.remove('hidden');
+    el('publicFooterTools').classList.add('hidden');
+    document.querySelector('.hero').classList.add('hidden');
+    ['billingPage','inventoryPage','notificationsPage','bikeAdminPage'].forEach(id=>el(id).classList.add('hidden'));
+    el('dashboardPage').classList.remove('hidden');
+    window.scrollTo({top:0,behavior:'smooth'});
+    renderNotifications();
+    renderDashboard();
+    renderBikeSales();
+  } else alert('Wrong password');
 };
 el('publicHomeBtn').onclick=()=>{el('logoutBtn').click(); window.scrollTo({top:0,behavior:'smooth'});};
-el('showServicesBtn').onclick=()=>{
-  el('servicesPage').classList.remove('hidden');
-  el('bookPage').classList.add('hidden');
-  el('bikeSalesPage').classList.add('hidden');
-};
-el('showBookBtn').onclick=()=>{
-  el('bookPage').classList.remove('hidden');
-  el('servicesPage').classList.add('hidden');
-  el('bikeSalesPage').classList.add('hidden');
-};
-el('showBikeSalesBtn').onclick=()=>{
-  el('bikeSalesPage').classList.remove('hidden');
-  el('servicesPage').classList.add('hidden');
-  el('bookPage').classList.add('hidden');
-  renderBikeSales();
-};
+
+function showPublicPage(pageId){
+  ['servicesPage','bookPage','bikeSalesPage','feedbackPage'].forEach(id=>el(id).classList.toggle('hidden', id!==pageId));
+  if(pageId==='bikeSalesPage') renderBikeSales();
+}
+el('showServicesBtn').onclick=()=>showPublicPage('servicesPage');
+el('showBookBtn').onclick=()=>showPublicPage('bookPage');
+el('showBikeSalesBtn').onclick=()=>showPublicPage('bikeSalesPage');
+el('showFeedbackBtn').onclick=()=>showPublicPage('feedbackPage');
+
 el('submitAppointmentBtn').onclick=()=>{
   const name=el('apptName').value.trim(), phone=el('apptPhone').value.trim(), bikeType=el('apptBikeType').value.trim();
   const date=el('apptDate').value, time=el('apptTime').value;
@@ -458,12 +496,51 @@ el('savePublicFeedbackBtn').onclick=()=>{
   addNotification('feedback', feedback);
   alert('Feedback submitted.');
 };
-el('logoutBtn').onclick=()=>{el('adminPanel').classList.add('hidden');el('publicSection').classList.remove('hidden');el('publicFooterTools').classList.remove('hidden');document.querySelector('.hero').classList.remove('hidden');};
-el('showInventory').onclick=()=>{el('inventoryPage').classList.remove('hidden');el('billingPage').classList.add('hidden');el('notificationsPage').classList.add('hidden');el('dashboardPage').classList.add('hidden');el('bikeAdminPage').classList.add('hidden');renderInventory();};
-el('showBilling').onclick=()=>{el('billingPage').classList.remove('hidden');el('inventoryPage').classList.add('hidden');el('notificationsPage').classList.add('hidden');el('dashboardPage').classList.add('hidden');el('bikeAdminPage').classList.add('hidden');};
-el('showNotifications').onclick=()=>{el('notificationsPage').classList.remove('hidden');el('billingPage').classList.add('hidden');el('inventoryPage').classList.add('hidden');el('dashboardPage').classList.add('hidden');el('bikeAdminPage').classList.add('hidden');renderNotifications();};
-el('showDashboard').onclick=()=>{el('dashboardPage').classList.remove('hidden');el('billingPage').classList.add('hidden');el('inventoryPage').classList.add('hidden');el('notificationsPage').classList.add('hidden');el('bikeAdminPage').classList.add('hidden');renderDashboard();};
-el('showBikeAdmin').onclick=()=>{el('bikeAdminPage').classList.remove('hidden');el('billingPage').classList.add('hidden');el('inventoryPage').classList.add('hidden');el('notificationsPage').classList.add('hidden');el('dashboardPage').classList.add('hidden');renderBikeAdmin();};
+el('logoutBtn').onclick=()=>{
+  el('adminPanel').classList.add('hidden');
+  el('publicSection').classList.remove('hidden');
+  el('publicFooterTools').classList.remove('hidden');
+  document.querySelector('.hero').classList.remove('hidden');
+};
+el('showInventory').onclick=()=>{
+  el('inventoryPage').classList.remove('hidden');
+  el('billingPage').classList.add('hidden');
+  el('notificationsPage').classList.add('hidden');
+  el('dashboardPage').classList.add('hidden');
+  el('bikeAdminPage').classList.add('hidden');
+  renderInventory();
+};
+el('showBilling').onclick=()=>{
+  el('billingPage').classList.remove('hidden');
+  el('inventoryPage').classList.add('hidden');
+  el('notificationsPage').classList.add('hidden');
+  el('dashboardPage').classList.add('hidden');
+  el('bikeAdminPage').classList.add('hidden');
+};
+el('showNotifications').onclick=()=>{
+  el('notificationsPage').classList.remove('hidden');
+  el('billingPage').classList.add('hidden');
+  el('inventoryPage').classList.add('hidden');
+  el('dashboardPage').classList.add('hidden');
+  el('bikeAdminPage').classList.add('hidden');
+  renderNotifications();
+};
+el('showDashboard').onclick=()=>{
+  el('dashboardPage').classList.remove('hidden');
+  el('billingPage').classList.add('hidden');
+  el('inventoryPage').classList.add('hidden');
+  el('notificationsPage').classList.add('hidden');
+  el('bikeAdminPage').classList.add('hidden');
+  renderDashboard();
+};
+el('showBikeAdmin').onclick=()=>{
+  el('bikeAdminPage').classList.remove('hidden');
+  el('billingPage').classList.add('hidden');
+  el('inventoryPage').classList.add('hidden');
+  el('notificationsPage').classList.add('hidden');
+  el('dashboardPage').classList.add('hidden');
+  renderBikeAdmin();
+};
 el('filterAllBtn').onclick=()=>renderDashboardTable('all');
 el('filterTodayBtn').onclick=()=>renderDashboardTable('today');
 el('filterDateBtn').onclick=()=>renderDashboardTable('date');
@@ -476,12 +553,31 @@ function generateBillNo(){let n; do{ n = Math.floor(100000+Math.random()*900000)
 function now(){return new Date().toLocaleString();}
 function isoNow(){return new Date().toISOString();}
 function invoiceDate(inv){const d=new Date(inv.createdAtISO || inv.time); return Number.isNaN(d.getTime()) ? new Date() : d;}
+
 function readFileAsDataURL(file){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=()=>resolve(reader.result);
     reader.onerror=reject;
     reader.readAsDataURL(file);
+  });
+}
+async function prepareBikeImage(file){
+  const originalDataUrl = await readFileAsDataURL(file);
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxWidth=900;
+      const scale=Math.min(1, maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      resolve(canvas.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=()=>resolve(originalDataUrl);
+    img.src=originalDataUrl;
   });
 }
 
@@ -491,18 +587,30 @@ function addRow(service='',qty=1,price=0){
   el('currentBillTable').querySelector('tbody').appendChild(tr);
   const serviceInput=tr.children[0].querySelector('input');
   const priceInput=tr.children[2].querySelector('input');
-  serviceInput.onblur=()=>{const sku=serviceInput.value.trim(); const item=storage.inventory.find(i=>i.sku===sku); if(item){serviceInput.value=item.name; priceInput.value=item.price; updateTotals();}};
-  [...tr.querySelectorAll('input')].forEach(i=>{i.onfocus=()=>{if(i.value==='0') i.value='';}; i.oninput=updateTotals;});
+  serviceInput.onblur=()=>{
+    const sku=serviceInput.value.trim();
+    const item=storage.inventory.find(i=>i.sku===sku);
+    if(item){serviceInput.value=item.name; priceInput.value=item.price; updateTotals();}
+  };
+  [...tr.querySelectorAll('input')].forEach(i=>{
+    i.onfocus=()=>{if(i.value==='0') i.value='';};
+    i.oninput=updateTotals;
+  });
   updateTotals();
 }
 function updateTotals(){
-  let total=0; el('currentBillTable').querySelectorAll('tbody tr').forEach(tr=>{
+  let total=0;
+  el('currentBillTable').querySelectorAll('tbody tr').forEach(tr=>{
     const qty=Number(tr.children[1].querySelector('input').value||0), price=Number(tr.children[2].querySelector('input').value||0), line=qty*price;
-    tr.querySelector('.lt').innerText=line; total+=line;
-  }); el('billTotalText').innerText=`Total: PKR ${total}`;
+    tr.querySelector('.lt').innerText=line;
+    total+=line;
+  });
+  el('billTotalText').innerText=`Total: PKR ${total}`;
 }
 function renderHistory(phone){
-  const rows=storage.invoices.filter(i=>i.phone===phone); const body=el('historyTable').querySelector('tbody'); body.innerHTML='';
+  const rows=storage.invoices.filter(i=>i.phone===phone);
+  const body=el('historyTable').querySelector('tbody');
+  body.innerHTML='';
   rows.forEach(i=>{
     const services = i.items.map(it=>`${it.service} (x${it.qty})`).join(', ');
     const tr=document.createElement('tr');
@@ -517,8 +625,10 @@ el('searchBtn').onclick=()=>{
   const phone=el('searchPhone').value.trim(), bill=el('searchBill').value.trim(), name=el('searchName').value.trim().toLowerCase();
   el('invoicePreview').classList.add('hidden');
   if(bill){
-    const inv=storage.invoices.find(x=>x.billNo===bill); if(!inv) return alert('Bill not found');
-    showInvoice(inv); return;
+    const inv=storage.invoices.find(x=>x.billNo===bill);
+    if(!inv) return alert('Bill not found');
+    showInvoice(inv);
+    return;
   }
   if(!phone && !name) return alert('Enter phone, name or bill number.');
   let selectedPhone=phone;
@@ -529,17 +639,26 @@ el('searchBtn').onclick=()=>{
   if(!selectedPhone) return alert('Enter phone, name or bill number.');
   if(selectedPhone.length!==11) return alert('Phone number must be exactly 11 digits.');
   const client=storage.clients[selectedPhone];
-  el('currentBillTable').querySelector('tbody').innerHTML=''; addRow(); addRow(); addRow(); el('billingWrap').classList.remove('hidden');
+  el('currentBillTable').querySelector('tbody').innerHTML='';
+  addRow(); addRow(); addRow();
+  el('billingWrap').classList.remove('hidden');
   if(client){
-    el('clientFormWrap').classList.remove('hidden'); el('clientHistoryWrap').classList.remove('hidden');
-    el('clientPhone').value=selectedPhone; el('clientName').value=client.name; el('clientBike').value=client.bike; el('clientAddress').value=client.address;
+    el('clientFormWrap').classList.remove('hidden');
+    el('clientHistoryWrap').classList.remove('hidden');
+    el('clientPhone').value=selectedPhone;
+    el('clientName').value=client.name;
+    el('clientBike').value=client.bike;
+    el('clientAddress').value=client.address;
     ['clientPhone','clientName','clientBike','clientAddress'].forEach(id=>el(id).disabled=true);
     el('editClientBtn').textContent='Edit';
     renderHistory(selectedPhone);
   } else {
     el('clientHistoryWrap').classList.add('hidden');
     el('clientFormWrap').classList.remove('hidden');
-    el('clientPhone').value=selectedPhone; el('clientName').value=''; el('clientBike').value=''; el('clientAddress').value='';
+    el('clientPhone').value=selectedPhone;
+    el('clientName').value='';
+    el('clientBike').value='';
+    el('clientAddress').value='';
     ['clientPhone','clientName','clientBike','clientAddress'].forEach(id=>el(id).disabled=false);
     el('editClientBtn').textContent='Editing...';
     showNewClientNotice(selectedPhone);
@@ -557,15 +676,22 @@ function showInvoice(inv){
   div.classList.remove('hidden');
 }
 window.downloadInvoice=(billNo)=>{
-  const inv=storage.invoices.find(x=>x.billNo===billNo); if(!inv) return;
+  const inv=storage.invoices.find(x=>x.billNo===billNo);
+  if(!inv) return;
   const text=`Invoice #${inv.billNo}\nTime: ${inv.time}\nClient: ${inv.name||'Customer'}\nPhone: ${inv.phone||'N/A'}\nBike: ${inv.bike||'N/A'}\n\n`+
   inv.items.map(i=>`${i.service} | Qty ${i.qty} | Price ${i.price} | Total ${i.qty*i.price}`).join('\n')+`\n\nGrand Total: ${inv.total}`;
-  const blob=new Blob([text],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`invoice-${billNo}.txt`; a.click();
-}
+  const blob=new Blob([text],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`invoice-${billNo}.txt`;
+  a.click();
+};
 
 el('saveInvoiceBtn').onclick=async ()=>{
   const items=[...el('currentBillTable').querySelectorAll('tbody tr')].map(tr=>({
-    service:tr.children[0].querySelector('input').value.trim(), qty:Number(tr.children[1].querySelector('input').value||1), price:Number(tr.children[2].querySelector('input').value||0)
+    service:tr.children[0].querySelector('input').value.trim(),
+    qty:Number(tr.children[1].querySelector('input').value||1),
+    price:Number(tr.children[2].querySelector('input').value||0)
   })).filter(x=>x.service);
   if(!items.length) return alert('Add at least one service');
   const phone=el('clientPhone').value.trim() || el('searchPhone').value.trim();
@@ -577,13 +703,16 @@ el('saveInvoiceBtn').onclick=async ()=>{
   const inv={billNo:generateBillNo(),time:now(),createdAtISO:isoNow(),phone,name,bike,address,items,total};
   storage.invoices.push(inv);
   await saveInvoice(inv);
-  showInvoice(inv); alert(`Invoice saved. Bill # ${inv.billNo}`);
-  renderHistory(phone); el('clientHistoryWrap').classList.remove('hidden'); renderDashboard();
+  showInvoice(inv);
+  alert(`Invoice saved. Bill # ${inv.billNo}`);
+  renderHistory(phone);
+  el('clientHistoryWrap').classList.remove('hidden');
+  renderDashboard();
 };
 
-
 function renderNotifications(){
-  const body=el('notifyTable').querySelector('tbody'); body.innerHTML='';
+  const body=el('notifyTable').querySelector('tbody');
+  body.innerHTML='';
   storage.notifications.forEach((n,idx)=>{
     const tr=document.createElement('tr');
     const summary=n.type==='appointment' ? `${n.payload.name} (${n.payload.phone})` : n.payload.text.slice(0,50);
@@ -627,12 +756,21 @@ function renderDashboardTable(mode){
     });
 }
 function openNotification(idx){
-  const n=storage.notifications[idx]; if(!n) return;
+  const n=storage.notifications[idx];
+  if(!n) return;
   const panel=el('notifyDetail');
   if(n.type==='appointment'){
     const existing=storage.clients[n.payload.phone];
     panel.innerHTML=`<h4>Appointment Request</h4><p><b>Name:</b> ${n.payload.name}</p><p><b>Phone:</b> ${n.payload.phone}</p><p><b>Bike:</b> ${n.payload.bikeType}</p><p><b>Services:</b> ${n.payload.services.join(', ')}</p><p><b>Date/Time:</b> ${n.payload.date} ${n.payload.time}</p><p><b>Notes:</b> ${n.payload.notes||'N/A'}</p><p><b>Client Status:</b> ${existing?'Existing':'New'}</p>${existing?`<button class="btn" id="reviewClientBtn">Review Existing Client</button>`:''}`;
-    if(existing){setTimeout(()=>{el('reviewClientBtn').onclick=()=>{el('showBilling').click();el('searchPhone').value=n.payload.phone;el('searchBtn').click();};},0);}
+    if(existing){
+      setTimeout(()=>{
+        el('reviewClientBtn').onclick=()=>{
+          el('showBilling').click();
+          el('searchPhone').value=n.payload.phone;
+          el('searchBtn').click();
+        };
+      },0);
+    }
   } else {
     panel.innerHTML=`<h4>Feedback</h4><p>${n.payload.text}</p><p><b>Submitted:</b> ${n.payload.createdAt}</p>`;
   }
@@ -640,7 +778,8 @@ function openNotification(idx){
 }
 
 function renderInventory(){
-  const tbody=el('invTable').querySelector('tbody'); tbody.innerHTML='';
+  const tbody=el('invTable').querySelector('tbody');
+  tbody.innerHTML='';
   storage.inventory.forEach(i=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${i.sku}</td><td>${i.name}</td><td>${i.qty}</td><td>${i.price}</td><td>${i.qty*i.price}</td><td><button class="btn secondary" data-edit-sku="${i.sku}">Edit</button></td>`;
@@ -649,7 +788,8 @@ function renderInventory(){
   });
 }
 function editInventoryItem(sku){
-  const item=storage.inventory.find(i=>i.sku===sku); if(!item) return;
+  const item=storage.inventory.find(i=>i.sku===sku);
+  if(!item) return;
   el('invOriginalSku').value=item.sku;
   el('invSku').value=item.sku;
   el('invName').value=item.name;
@@ -662,11 +802,16 @@ function clearInventoryForm(){
   el('addInvBtn').textContent='Add / Update Item';
 }
 function renderBikeSales(){
-  const list=el('bikeSalesList'); if(!list) return;
+  const list=el('bikeSalesList');
+  if(!list) return;
   list.innerHTML='';
-  if(!storage.bikes.length){list.innerHTML='<p class="muted">No bike sale listings are available right now.</p>'; return;}
+  if(!storage.bikes.length){
+    list.innerHTML='<p class="muted">No bike sale listings are available right now.</p>';
+    return;
+  }
   storage.bikes.forEach(b=>{
-    const card=document.createElement('div'); card.className='card bike-card';
+    const card=document.createElement('div');
+    card.className='card bike-card';
     card.innerHTML=`<img src="${b.image||''}" alt="${b.name}" onerror="this.style.display='none'"><div class="bike-card-body"><span class="status-badge ${b.status==='sold'?'sold':''}">${b.status==='sold'?'Sold':'Available for Sale'}</span><h3>${b.name}</h3><p><b>Price:</b> PKR ${Number(b.price||0).toLocaleString()}</p><p class="muted">${b.details||'Contact us for details.'}</p></div>`;
     list.appendChild(card);
   });
@@ -679,18 +824,30 @@ function clearBikeForm(){
 }
 function renderBikeAdmin(){
   renderBikeSales();
-  const tbody=el('bikeAdminTable').querySelector('tbody'); tbody.innerHTML='';
+  const tbody=el('bikeAdminTable').querySelector('tbody');
+  tbody.innerHTML='';
   storage.bikes.forEach(b=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${b.image?`<img src="${b.image}" alt="${b.name}" style="width:80px;height:55px;object-fit:cover" onerror="this.style.display='none'">`:'No picture'}</td><td>${b.name}</td><td>${Number(b.price||0).toLocaleString()}</td><td>${b.status==='sold'?'Sold':'Available'}</td><td>${b.details||''}</td><td><div class="table-actions"><button class="btn secondary" data-edit-bike="${b.id}">Edit</button><button class="btn" data-remove-bike="${b.id}">Remove</button></div></td>`;
     tr.querySelector('[data-edit-bike]').onclick=()=>editBikeListing(b.id);
-    tr.querySelector('[data-remove-bike]').onclick=async()=>{if(confirm('Remove this bike listing?')){await removeBikeListing(b.id);renderBikeAdmin();}};
+    tr.querySelector('[data-remove-bike]').onclick=async()=>{
+      if(confirm('Remove this bike listing?')){
+        await removeBikeListing(b.id);
+        renderBikeAdmin();
+      }
+    };
     tbody.appendChild(tr);
   });
 }
 function editBikeListing(id){
-  const b=storage.bikes.find(x=>x.id===id); if(!b) return;
-  el('bikeOriginalId').value=b.id; el('bikeName').value=b.name; el('bikePrice').value=b.price; el('bikeImage').value=b.image||''; el('bikeStatus').value=b.status||'available'; el('bikeDetails').value=b.details||'';
+  const b=storage.bikes.find(x=>x.id===id);
+  if(!b) return;
+  el('bikeOriginalId').value=b.id;
+  el('bikeName').value=b.name;
+  el('bikePrice').value=b.price;
+  el('bikeImage').value=b.image||'';
+  el('bikeStatus').value=b.status||'available';
+  el('bikeDetails').value=b.details||'';
   el('saveBikeBtn').textContent='Save Bike Changes';
 }
 el('addInvBtn').onclick=async ()=>{
@@ -700,18 +857,32 @@ el('addInvBtn').onclick=async ()=>{
   await saveInventoryItem(item, originalSku);
   renderInventory();
   clearInventoryForm();
-}
+};
 el('saveBikeBtn').onclick=async()=>{
   const id=el('bikeOriginalId').value || `bike-${Date.now()}`;
   const existing=storage.bikes.find(b=>b.id===id);
   const file=el('bikeImageFile').files[0];
-  const uploadedImage=file ? await readFileAsDataURL(file) : '';
-  const bike={id,name:el('bikeName').value.trim(),price:Number(el('bikePrice').value||0),image:uploadedImage || el('bikeImage').value.trim() || existing?.image || '',status:el('bikeStatus').value,details:el('bikeDetails').value.trim(),updatedAt:isoNow()};
+  const uploadedImage=file ? await prepareBikeImage(file) : '';
+  const bike={
+    id,
+    name:el('bikeName').value.trim(),
+    price:Number(el('bikePrice').value||0),
+    image:uploadedImage || el('bikeImage').value.trim() || existing?.image || '',
+    status:el('bikeStatus').value,
+    details:el('bikeDetails').value.trim(),
+    updatedAt:isoNow()
+  };
   if(!bike.name) return alert('Enter bike name/model');
-  await saveBikeListing(bike);
-  clearBikeForm();
-  renderBikeAdmin();
-}
+  try{
+    await saveBikeListing(bike);
+    clearBikeForm();
+    renderBikeAdmin();
+    alert('Bike listing saved successfully.');
+  }catch(err){
+    console.error(err);
+    alert('Picture could not be saved. Please try a smaller image or paste an image URL.');
+  }
+};
 el('removeBikePictureBtn').onclick=()=>{
   el('bikeImage').value='';
   el('bikeImageFile').value='';
@@ -720,7 +891,7 @@ el('removeBikePictureBtn').onclick=()=>{
     const bike=storage.bikes.find(b=>b.id===id);
     if(bike) bike.image='';
   }
-}
+};
 el('clearBikeFormBtn').onclick=clearBikeForm;
 loadPublicData();
 </script>
